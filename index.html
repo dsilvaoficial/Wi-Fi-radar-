@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Simulação Wi-Fi Sensing</title>
+<style>
+  body {
+    margin: 0;
+    background: black;
+    color: #00ffcc;
+    font-family: Arial;
+    text-align: center;
+  }
+  video, canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  #info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 18px;
+  }
+</style>
+</head>
+<body>
+
+<div id="info">Detectando...</div>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const info = document.getElementById("info");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+  maxNumHands: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
+
+hands.onResults(results => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (results.multiHandLandmarks.length > 0) {
+    const landmarks = results.multiHandLandmarks[0];
+
+    // Ponto da palma
+    const palm = landmarks[0];
+
+    const x = palm.x * canvas.width;
+    const y = palm.y * canvas.height;
+
+    // Simulação de "intensidade do sinal"
+    const distance = Math.sqrt(x*x + y*y);
+    
+    // Desenha "esqueleto"
+    ctx.fillStyle = "#00ffcc";
+    landmarks.forEach(point => {
+      ctx.beginPath();
+      ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+
+    // Interpretação do "sinal"
+    if (distance < 500) {
+      info.innerText = "🔴 Pessoa MUITO próxima (sinal forte)";
+    } else if (distance < 900) {
+      info.innerText = "🟡 Pessoa detectada (sinal médio)";
+    } else {
+      info.innerText = "🟢 Pessoa distante (sinal fraco)";
+    }
+
+  } else {
+    info.innerText = "❌ Nenhuma pessoa detectada";
+  }
+});
+
+const camera = new Camera(video, {
+  onFrame: async () => {
+    await hands.send({image: video});
+  },
+  width: 640,
+  height: 480
+});
+
+camera.start();
+</script>
+
+</body>
+</html>
