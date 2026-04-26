@@ -2,13 +2,14 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Detector Inteligente</title>
+<title>Câmera de Segurança</title>
 
 <style>
 body {
   margin: 0;
   background: black;
-  overflow: hidden;
+  color: white;
+  font-family: Arial;
 }
 
 video, canvas {
@@ -17,51 +18,63 @@ video, canvas {
   left: 0;
 }
 
-button {
+#alert {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 10;
+  top: 20px;
+  left: 20px;
+  background: red;
   padding: 10px;
+  font-size: 20px;
+  display: none;
+}
+
+#status {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
   font-size: 16px;
+}
+
+#snapshot {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 120px;
+  border: 2px solid white;
 }
 </style>
 </head>
 
 <body>
 
-<button onclick="switchCamera()">Trocar Câmera</button>
+<div id="alert">🚨 MOVIMENTO DETECTADO</div>
+<div id="status">Aguardando...</div>
 
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
+<img id="snapshot" />
+
+<audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
 
 <script>
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-let frameCount = 0;
+const alertBox = document.getElementById("alert");
+const statusText = document.getElementById("status");
+const snapshot = document.getElementById("snapshot");
+const alarm = document.getElementById("alarm");
+
 let previousFrame = null;
-let stableCount = 0;
-let currentFacingMode = "environment"; // traseira
+let motionCount = 0;
+let lastAlertTime = 0;
 
-async function startCamera() {
-  if (window.stream) {
-    window.stream.getTracks().forEach(track => track.stop());
-  }
-
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: currentFacingMode }
-  });
-
-  window.stream = stream;
+// iniciar câmera
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+.then(stream => {
   video.srcObject = stream;
-}
-
-function switchCamera() {
-  currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
-  startCamera();
-}
+});
 
 video.addEventListener("loadeddata", () => {
   canvas.width = video.videoWidth;
@@ -74,61 +87,53 @@ video.addEventListener("loadeddata", () => {
 
     if (previousFrame) {
       let diff = 0;
-      let minX = canvas.width, minY = canvas.height;
-      let maxX = 0, maxY = 0;
 
-      for (let i = 0; i < frame.data.length; i += 8) { // otimizado (pula pixels)
+      for (let i = 0; i < frame.data.length; i += 16) {
         let delta =
           Math.abs(frame.data[i] - previousFrame.data[i]) +
           Math.abs(frame.data[i+1] - previousFrame.data[i+1]) +
           Math.abs(frame.data[i+2] - previousFrame.data[i+2]);
 
-        if (delta > 60) {
-          diff++;
-
-          let index = i / 4;
-          let x = index % canvas.width;
-          let y = Math.floor(index / canvas.width);
-
-          if (x < minX) minX = x;
-          if (y < minY) minY = y;
-          if (x > maxX) maxX = x;
-          if (y > maxY) maxY = y;
-        }
+        if (delta > 60) diff++;
       }
 
-      const area = (maxX - minX) * (maxY - minY);
-
-      if (diff > 800 && area > 500 && area < 120000) {
-        stableCount++;
-
-        if (stableCount > 2) {
-          ctx.strokeStyle = "lime";
-          ctx.lineWidth = 3;
-          ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
-        }
+      // DETECÇÃO
+      if (diff > 1500) {
+        motionCount++;
       } else {
-        stableCount = 0;
+        motionCount = 0;
+      }
+
+      // ALERTA REAL
+      if (motionCount > 3 && Date.now() - lastAlertTime > 3000) {
+        lastAlertTime = Date.now();
+
+        alertBox.style.display = "block";
+        statusText.innerText = "🚨 Movimento detectado!";
+
+        // tocar som
+        alarm.play();
+
+        // salvar imagem
+        snapshot.src = canvas.toDataURL("image/png");
+
+        setTimeout(() => {
+          alertBox.style.display = "none";
+        }, 2000);
+      } else {
+        statusText.innerText = "🟢 Ambiente normal";
       }
     }
-
-    frameCount++;
-
-if (frameCount < 30) {
-  previousFrame = frame;
-  requestAnimationFrame(detectMotion);
-  return;
-}
 
     previousFrame = frame;
     requestAnimationFrame(detectMotion);
   }
 
-  detectMotion();
+  // calibração inicial
+  setTimeout(() => {
+    detectMotion();
+  }, 1000);
 });
-
-// inicia câmera
-startCamera();
 </script>
 
 </body>
