@@ -40,6 +40,7 @@ const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
+let frameCount = 0;
 let previousFrame = null;
 let stableCount = 0;
 let currentFacingMode = "environment"; // traseira
@@ -110,6 +111,14 @@ video.addEventListener("loadeddata", () => {
         stableCount = 0;
       }
     }
+
+    frameCount++;
+
+if (frameCount < 30) {
+  previousFrame = frame;
+  requestAnimationFrame(detectMotion);
+  return;
+}
 
     previousFrame = frame;
     requestAnimationFrame(detectMotion);
