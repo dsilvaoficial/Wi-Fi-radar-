@@ -124,15 +124,16 @@ video.addEventListener("loadeddata", () => {
         statusText.innerText = "🟢 Ambiente normal";
       }
     }
-
+    
     previousFrame = frame;
-    requestAnimationFrame(detectMotion);
   }
+    
+    function loop() {
+  detectMotion();
+  setTimeout(loop, 100);
+}
 
-  // calibração inicial
-  setTimeout(() => {
-    detectMotion();
-  }, 1000);
+loop();
 });
 </script>
 
