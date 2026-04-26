@@ -2,103 +2,88 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Simulação Wi-Fi Sensing</title>
+<title>Detector de Movimento</title>
 <style>
-  body {
-    margin: 0;
-    background: black;
-    color: #00ffcc;
-    font-family: Arial;
-    text-align: center;
-  }
+  body { margin:0; background:black; }
   video, canvas {
-    position: absolute;
-    left: 0;
-    top: 0;
-  }
-  #info {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    font-size: 18px;
+    position:absolute;
+    top:0;
+    left:0;
   }
 </style>
 </head>
 <body>
 
-<div id="info">Detectando...</div>
-
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
-
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const info = document.getElementById("info");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+let previousFrame = null;
 
-const hands = new Hands({
-  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-});
+// Acessar câmera
+navigator.mediaDevices.getUserMedia({ video: true })
+.then(stream => {
+  video.srcObject = stream;
+})
+.catch(err => console.error(err));
 
-hands.setOptions({
-  maxNumHands: 1,
-  minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.7
-});
+video.addEventListener("loadeddata", () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-hands.onResults(results => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function detectMotion() {
+    ctx.drawImage(video, 0, 0);
 
-  if (results.multiHandLandmarks.length > 0) {
-    const landmarks = results.multiHandLandmarks[0];
+    let frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    // Ponto da palma
-    const palm = landmarks[0];
+    if (previousFrame) {
+      let diff = 0;
+      let minX = canvas.width, minY = canvas.height;
+      let maxX = 0, maxY = 0;
 
-    const x = palm.x * canvas.width;
-    const y = palm.y * canvas.height;
+      for (let i = 0; i < frame.data.length; i += 4) {
+        let r = frame.data[i];
+        let g = frame.data[i+1];
+        let b = frame.data[i+2];
 
-    // Simulação de "intensidade do sinal"
-    const distance = Math.sqrt(x*x + y*y);
-    
-    // Desenha "esqueleto"
-    ctx.fillStyle = "#00ffcc";
-    landmarks.forEach(point => {
-      ctx.beginPath();
-      ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, 2 * Math.PI);
-      ctx.fill();
-    });
+        let r2 = previousFrame.data[i];
+        let g2 = previousFrame.data[i+1];
+        let b2 = previousFrame.data[i+2];
 
-    // Interpretação do "sinal"
-    if (distance < 500) {
-      info.innerText = "🔴 Pessoa MUITO próxima (sinal forte)";
-    } else if (distance < 900) {
-      info.innerText = "🟡 Pessoa detectada (sinal médio)";
-    } else {
-      info.innerText = "🟢 Pessoa distante (sinal fraco)";
+        let delta = Math.abs(r - r2) + Math.abs(g - g2) + Math.abs(b - b2);
+
+        if (delta > 50) {
+          diff++;
+
+          let index = i / 4;
+          let x = index % canvas.width;
+          let y = Math.floor(index / canvas.width);
+
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+
+      // Se teve mudança suficiente
+      if (diff > 5000) {
+        ctx.strokeStyle = "lime";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+      }
     }
 
-  } else {
-    info.innerText = "❌ Nenhuma pessoa detectada";
+    previousFrame = frame;
+    requestAnimationFrame(detectMotion);
   }
-});
 
-const camera = new Camera(video, {
-  onFrame: async () => {
-    await hands.send({image: video});
-  },
-  width: 640,
-  height: 480
+  detectMotion();
 });
-
-camera.start();
 </script>
 
 </body>
