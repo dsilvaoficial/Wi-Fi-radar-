@@ -76,7 +76,7 @@ video.addEventListener("loadeddata", () => {
       let minX = canvas.width, minY = canvas.height;
       let maxX = 0, maxY = 0;
 
-      for (let i = 0; i < frame.data.length; i += 16) { // otimizado (pula pixels)
+      for (let i = 0; i < frame.data.length; i += 8) { // otimizado (pula pixels)
         let delta =
           Math.abs(frame.data[i] - previousFrame.data[i]) +
           Math.abs(frame.data[i+1] - previousFrame.data[i+1]) +
@@ -98,7 +98,7 @@ video.addEventListener("loadeddata", () => {
 
       const area = (maxX - minX) * (maxY - minY);
 
-      if (diff > 2000 && area > 1500 && area < 60000) {
+      if (diff > 800 && area > 500 && area < 120000) {
         stableCount++;
 
         if (stableCount > 2) {
